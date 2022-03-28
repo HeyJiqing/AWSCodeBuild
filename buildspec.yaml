@@ -8,4 +8,4 @@ phases:
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
   post_build:
     commands:
-      - kubectl apply -f demo/*
+      - cd demo && kubectl apply -f *
