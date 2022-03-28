@@ -2,18 +2,11 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    cattle.io/creator: norman
+    workload.user.cattle.io/workloadselector: deployment-default-demoapp
   name: demoapp
-  namespace: default
-  ownerReferences:
-  - apiVersion: apps/v1
-    controller: true
-    kind: deployment
-    name: demoapp
 spec:
   ports:
-  - name: http-demoapp
-    port: 80
+  - port: 80
     protocol: TCP
     targetPort: 80
   selector:
