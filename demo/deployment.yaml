@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    workload.user.cattle.io/workloadselector: deployment-default-demoapp
+  name: demoapp
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      workload.user.cattle.io/workloadselector: deployment-default-demoapp
+  template:
+    metadata:
+      labels:
+        workload.user.cattle.io/workloadselector: deployment-default-demoapp
+    spec:
+      containers:
+      - image: nginx:latest
+        imagePullPolicy: Always
+        name: nginx
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
