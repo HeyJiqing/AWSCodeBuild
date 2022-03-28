@@ -8,5 +8,6 @@ phases:
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
   post_build:
     commands:
+      - aws --version
       - cat /root/.kube/config
       - kubectl get all -A
