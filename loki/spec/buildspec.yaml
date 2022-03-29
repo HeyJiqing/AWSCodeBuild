@@ -14,9 +14,11 @@ phases:
       - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
       - chmod +x kubectl && mv kubectl /usr/local/bin/
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+      # - "待补充创建 LOKI SA"
 
   build:
     commands:
+      # - "待补充 sed 替换 loki sa annotation"
       - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
       - sed -i "s/LOKI_SA_ROLE_ARN/$LOKI_SA_ROLE_ARN/g" loki/yaml/serviceaccount-loki.yaml
       - cd loki/yaml && kubectl apply -f .
