@@ -9,7 +9,7 @@ metadata:
     release: loki
     heritage: Helm
   annotations:
-    {}
+    eks.amazonaws.com/role-arn: LOKI_SA_ROLE_ARN
 spec:
   type: ClusterIP
   ports:
