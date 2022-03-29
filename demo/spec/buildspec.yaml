@@ -18,6 +18,6 @@ phases:
 
   post_build:
     commands:
-      - sed -i -e "s/SERVICE_NAME/$SERVICE_NAME/g" -e "s/CONTAINER_PORT/$CONTAINER_PORT/g" -e "s/TARGET_PORT/$TARGET_PORT/g" -e "s/SERVICE_TYPE/$SERVICE_TYPE/g" ../yaml/service.yaml
-      - cat ../yaml/service.yaml
-      # - cd ../yaml && kubectl apply -f .
+      - sed -i -e "s/SERVICE_NAME/$SERVICE_NAME/g" -e "s/CONTAINER_PORT/$CONTAINER_PORT/g" -e "s/TARGET_PORT/$TARGET_PORT/g" -e "s/SERVICE_TYPE/$SERVICE_TYPE/g" demo/yaml/service.yaml
+      - cat demo/yaml/service.yaml
+      # - cd demo/yaml && kubectl apply -f .
