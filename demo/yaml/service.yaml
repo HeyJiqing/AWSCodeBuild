@@ -3,12 +3,12 @@ kind: Service
 metadata:
   labels:
     workload.user.cattle.io/workloadselector: deployment-default-demoapp
-  name: demoapp
+  name: SERVICE_NAME
 spec:
   ports:
-  - port: 80
+  - port: CONTAINER_PORT
     protocol: TCP
-    targetPort: 80
+    targetPort: TARGET_PORT
   selector:
     workload.user.cattle.io/workloadselector: deployment-default-demoapp
-  type: ClusterIP
+  type: SERVICE_TYPE
