@@ -21,3 +21,5 @@ phases:
   install:
     commands:
       - cat env.yaml
+      - sed -i -e "s/SERVICE_NAME/$SERVICE_NAME/g" -e "s/CONTAINER_PORT/$CONTAINER_PORT/g" -e "s/TARGET_PORT/$TARGET_PORT/g" -e "s/SERVICE_TYPE/$SERVICE_TYPE/g" env.yaml
+      - cat env.yaml
