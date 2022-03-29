@@ -15,9 +15,17 @@ phases:
       - chmod +x kubectl && mv kubectl /usr/local/bin/
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
 
-  post_build:
+  build:
     commands:
       - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
       - sed -i "s/LOKI_SA_ROLE_ARN/$LOKI_SA_ROLE_ARN/g" loki/yaml/serviceaccount-loki.yaml
       - cd loki/yaml && kubectl apply -f .
       - kubectl -n loki get all
+      
+  post_build:
+    commands:
+      - echo "===============Grafana Login Info==============="
+      - echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d`
+      - echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d`
+      - echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}`
+      - echo "===============Grafana Login Info==============="

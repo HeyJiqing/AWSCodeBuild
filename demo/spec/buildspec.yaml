@@ -3,20 +3,28 @@ version: 0.2
 phases:
   install:
     commands:
-      - pip3 uninstall awscli -y
-      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-      - unzip awscliv2.zip
-      - sudo ./aws/install
-      - aws --version
+      # - pip3 uninstall awscli -y
+      # - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      # - unzip awscliv2.zip
+      # - sudo ./aws/install
+      # - aws --version
 
   pre_build:
     commands:
-      - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
-      - chmod +x kubectl && mv kubectl /usr/local/bin/
+      # - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+      # - chmod +x kubectl && mv kubectl /usr/local/bin/
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+  build:
+    commands:
+      # - sed -i -e "s/SERVICE_NAME/$SERVICE_NAME/g" -e "s/CONTAINER_PORT/$CONTAINER_PORT/g" -e "s/TARGET_PORT/$TARGET_PORT/g" -e "s/SERVICE_TYPE/$SERVICE_TYPE/g" demo/yaml/service.yaml
+      # - cat demo/yaml/service.yaml
+      # - cd demo/yaml && kubectl apply -f .
 
   post_build:
     commands:
-      - sed -i -e "s/SERVICE_NAME/$SERVICE_NAME/g" -e "s/CONTAINER_PORT/$CONTAINER_PORT/g" -e "s/TARGET_PORT/$TARGET_PORT/g" -e "s/SERVICE_TYPE/$SERVICE_TYPE/g" demo/yaml/service.yaml
-      - cat demo/yaml/service.yaml
-      - cd demo/yaml && kubectl apply -f .
+      - echo "===============Grafana Login Info==============="
+      - echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d`
+      - echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d`
+      - echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl get svc nginx-demoapp-nodeport -o jsonpath={.spec.ports[0].nodePort}`
+      - echo "===============Grafana Login Info==============="
