@@ -8,7 +8,7 @@ metadata:
     heritage: Helm
   name: loki-promtail-clusterrole
 rules:
-- apiGroups: [""]
+- apiGroups: [""] # "" indicates the core API group
   resources:
   - nodes
   - nodes/proxy

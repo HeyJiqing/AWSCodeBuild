@@ -27,7 +27,7 @@ spec:
         checksum/config: b41da9c53d085f76b5d9755ce7d49969873a5c832f083ceb2e4d2607e55ea8f7
         checksum/dashboards-json-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
         checksum/sc-dashboard-provider-config: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/secret: e99355564fab110bd83c8522d41326e740b7d77e83828d7c894be5e720fab625
+        checksum/secret: d94141c7753ed17e22657dd921c5ce70dc0440785852de3bfe35b8fb22b6c340
     spec:
       
       serviceAccountName: loki-grafana

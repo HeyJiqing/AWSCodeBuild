@@ -8,6 +8,8 @@ metadata:
     chart: loki-2.9.1
     release: loki
     heritage: Helm
+  annotations:
+    {}
 spec:
   type: ClusterIP
   ports:
