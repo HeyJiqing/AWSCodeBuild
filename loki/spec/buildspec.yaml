@@ -23,11 +23,11 @@ phases:
       - eksctl utils associate-iam-oidc-provider --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --approve
       - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document file://loki/iam/serviceaccount-loki.json
       - eksctl create iamserviceaccount --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
+      - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
+      - sed -i "s/LOKI_SA_ROLE_ARN/$LOKI_SA_ROLE_ARN/g" loki/yaml/serviceaccount-loki.yaml
   
   build:
     commands:
-      - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
-      - sed -i "s/LOKI_SA_ROLE_ARN/$LOKI_SA_ROLE_ARN/g" loki/yaml/serviceaccount-loki.yaml
       - cd loki/yaml && kubectl apply -f .
       - kubectl -n loki get all
 
