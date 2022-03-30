@@ -19,9 +19,11 @@ phases:
 
   pre_build:
     commands:
+      - sed -i "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/iam/serviceaccount-loki.json
       - eksctl utils associate-iam-oidc-provider --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --approve
       - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document loki/iam/serviceaccount-loki.json
       - eksctl create iamserviceaccount --cluster $EKS_CLUSTER_NAME --name loki --attach-policy-arn arn:aws:iam::$ACCOUNT_ID:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
+  
   build:
     commands:
       - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
