@@ -37,7 +37,7 @@ data:
       - from: "2022-01-01"
         index:
           period: 0
-          prefix: index_
+          prefix: lokiindex_
         object_store: aws
         schema: v11
         store: aws
