@@ -31,23 +31,16 @@
                 "iam:TagRole",
                 "eks:UpdateClusterConfig",
                 "iam:TagPolicy",
-                "s3:GetBucketAcl",
                 "iam:CreateOpenIDConnectProvider",
                 "iam:CreatePolicy",
-                "s3:PutObject",
-                "s3:GetObject",
                 "eks:DescribeCluster",
                 "iam:GetOpenIDConnectProvider",
-                "iam:TagOpenIDConnectProvider",
-                "s3:GetBucketLocation",
-                "s3:GetObjectVersion"
+                "iam:TagOpenIDConnectProvider"
             ],
             "Resource": [
                 "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/*",
                 "arn:aws:iam::${ACCOUNT_ID}:role/*",
                 "arn:aws:iam::${ACCOUNT_ID}:policy/*",
-                "arn:aws:s3:::*/*",
-                "arn:aws:s3:::${CODEBUILD_ARTIFACTS_BUCKET_NAME}",
                 "arn:aws:eks:*:${ACCOUNT_ID}:cluster/*"
             ]
         }
