@@ -27,7 +27,8 @@ phases:
   
   build:
     commands:
-      - cd loki/yaml && kubectl apply -f .
+      - cd loki/yaml && kubectl apply -f namespace.yaml
+      - kubectl apply -f .
       - kubectl -n loki get all
 
   post_build:
