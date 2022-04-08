@@ -19,10 +19,10 @@ phases:
 
   pre_build:
     commands:
-      - eksctl utils associate-iam-oidc-provider --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --approve
-      - sed -i -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" loki/iam/iampolicy-serviceaccount-loki.json
-      - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document file://loki/iam/iampolicy-serviceaccount-loki.json
-      - eksctl create iamserviceaccount --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
+      # - eksctl utils associate-iam-oidc-provider --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --approve
+      # - sed -i -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" loki/iam/iampolicy-serviceaccount-loki.json
+      # - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document file://loki/iam/iampolicy-serviceaccount-loki.json
+      # - eksctl create iamserviceaccount --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
       - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
   
   build:
