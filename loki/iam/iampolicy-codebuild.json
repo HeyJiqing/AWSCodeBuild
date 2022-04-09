@@ -38,10 +38,10 @@
                 "iam:TagOpenIDConnectProvider"
             ],
             "Resource": [
-                "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/*",
-                "arn:aws:iam::${ACCOUNT_ID}:role/*",
-                "arn:aws:iam::${ACCOUNT_ID}:policy/*",
-                "arn:aws:eks:*:${ACCOUNT_ID}:cluster/*"
+                "arn:${LOCATION}:iam::${ACCOUNT_ID}:oidc-provider/*",
+                "arn:${LOCATION}:iam::${ACCOUNT_ID}:role/*",
+                "arn:${LOCATION}:iam::${ACCOUNT_ID}:policy/*",
+                "arn:${LOCATION}:eks:*:${ACCOUNT_ID}:cluster/*"
             ]
         }
     ]
