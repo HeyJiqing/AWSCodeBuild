@@ -28,11 +28,11 @@ phases:
       - sed -i -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/LOCATION/$LOCATION/g" loki/iam/iampolicy-serviceaccount-loki.json
       - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document file://loki/iam/iampolicy-serviceaccount-loki.json
       - eksctl create iamserviceaccount --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
-      - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/configmap-loki.yaml
+      - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/loki-all.yaml
   
   build:
     commands:
-      - cd loki/yaml && kubectl apply -f .
+      - kubectl apply -f loki/yaml/loki-all.yaml
       - kubectl -n loki get all
 
   post_build:
