@@ -10,13 +10,14 @@ phases:
       - aws --version
       - export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
       - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
-      - curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xzf
+      - wget https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
       - tar zxf eksctl_Linux_amd64.tar.gz
       - chmod +x eksctl && mv eksctl /usr/local/bin/
       - eksctl version
       - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
       - chmod +x kubectl && mv kubectl /usr/local/bin/
       - kubectl version
+      - kubectl create ns loki
       - yum install git -y
       - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
       - cd AWSCodeBuild
@@ -31,8 +32,7 @@ phases:
   
   build:
     commands:
-      - cd loki/yaml && kubectl apply -f namespace.yaml
-      - kubectl apply -f .
+      - cd loki/yaml && kubectl apply -f .
       - kubectl -n loki get all
 
   post_build:
