@@ -3,13 +3,7 @@ version: 0.2
 phases:
   install:
     commands:
-      - pip3 uninstall awscli -y
-      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-      - unzip awscliv2.zip
-      - sudo ./aws/install
-      - aws --version
-      - export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
-      - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+      - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
       - wget https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
       - tar zxf eksctl_Linux_amd64.tar.gz
       - chmod +x eksctl && mv eksctl /usr/local/bin/
@@ -24,11 +18,9 @@ phases:
 
   pre_build:
     commands:
-      - eksctl utils associate-iam-oidc-provider --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --approve
-      - sed -i -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/ACCOUNT_ID/$ACCOUNT_ID/g" -e "s/LOCATION/$LOCATION/g" loki/iam/iampolicy-serviceaccount-loki.json
-      - aws iam create-policy --policy-name ServiceAccountLokiIAMPolicy --policy-document file://loki/iam/iampolicy-serviceaccount-loki.json
-      - eksctl create iamserviceaccount --region $AWS_REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn arn:aws:iam::${ACCOUNT_ID}:policy/ServiceAccountLokiIAMPolicy --override-existing-serviceaccounts --approve
-      - sed -i -e "s/LOKI_STORE_REGION/$LOKI_STORE_REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/loki-all.yaml
+      - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
+      - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
+      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/loki-all.yaml
   
   build:
     commands:

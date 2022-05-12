@@ -163,9 +163,9 @@ data:
       http_listen_port: 3100
     storage_config:
       aws:
-        s3: s3://LOKI_STORE_REGION/LOKI_BUCKET_NAME
+        s3: s3://REGION/LOKI_BUCKET_NAME
         dynamodb:
-          dynamodb_url: dynamodb://LOKI_STORE_REGION
+          dynamodb_url: dynamodb://REGION
     table_manager:
       retention_deletes_enabled: true
       retention_period: 720h
