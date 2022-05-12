@@ -12,7 +12,6 @@ phases:
       - chmod +x kubectl && mv kubectl /usr/local/bin/
       - kubectl version
       - kubectl create ns loki
-      - yum install git -y
       - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
       - cd AWSCodeBuild
 
@@ -20,11 +19,11 @@ phases:
     commands:
       - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
       - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" loki/yaml/loki-all.yaml
+      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-all.yaml
   
   build:
     commands:
-      - kubectl apply -f loki/yaml/loki-all.yaml
+      - kubectl apply -f yaml/loki-all.yaml
       - kubectl -n loki get all
 
   post_build:
