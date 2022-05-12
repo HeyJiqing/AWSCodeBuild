@@ -155,7 +155,7 @@ data:
       - from: "2022-01-01"
         index:
           period: 0
-          prefix: lokiindex_
+          prefix: LOKI_DDB_TABLE_NAME
         object_store: aws
         schema: v11
         store: aws
