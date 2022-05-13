@@ -4,7 +4,7 @@ phases:
   install:
     commands:
       - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
-      - wget https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
+      - wget $DOWNLOAD_URL
       - tar zxf eksctl_Linux_amd64.tar.gz
       - chmod +x eksctl && mv eksctl /usr/local/bin/
       - eksctl version
