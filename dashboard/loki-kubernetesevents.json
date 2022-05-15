@@ -916,7 +916,7 @@
         "type": "logs"
       }
     ],
-    "refresh": "",
+    "refresh": "1m",
     "schemaVersion": 34,
     "style": "dark",
     "tags": [
