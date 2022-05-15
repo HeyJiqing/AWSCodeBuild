@@ -162,7 +162,7 @@
       ]
     },
     "time": {
-      "from": "now-30m",
+      "from": "now-1h",
       "to": "now"
     },
     "timepicker": {
@@ -180,7 +180,7 @@
       ]
     },
     "timezone": "",
-    "title": "Loki Logs with Quick Search",
+    "title": "Container Log Quick Search",
     "uid": "7ecZpUkRk",
     "version": 2,
     "description": "A very simple dashboard for logs, allowing to filter by container name, and case-insensitive search."

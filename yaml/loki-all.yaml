@@ -134,6 +134,10 @@ data:
     compactor:
       shared_store: aws
       working_directory: /data/loki/boltdb-shipper-compactor
+    querier:
+      max_concurrent: 2048
+    query_scheduler:
+      max_outstanding_requests_per_tenant: 2048
     ingester:
       chunk_block_size: 262144
       chunk_idle_period: 3m
@@ -484,6 +488,7 @@ spec:
           args:
             - "-config.file=/etc/promtail/promtail.yaml"
             - "-client.url=http://loki:3100/loki/api/v1/push"
+            - "-log.format=logfmt"
           volumeMounts:
             - name: config
               mountPath: /etc/promtail
@@ -1092,3 +1097,72 @@ spec:
             name: loki-loki
         - name: storage
           emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: event-exporter
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: event-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    namespace: kube-system
+    name: event-exporter
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-exporter-cfg
+  namespace: kube-system
+data:
+  config.yaml: |
+    logLevel: error
+    logFormat: json
+    route:
+      routes:
+        - match:
+            - receiver: "dump"
+    receivers:
+      - name: "dump"
+        file:
+          path: "/dev/stdout"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-exporter
+  namespace: kube-system
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: event-exporter
+        version: v1
+    spec:
+      serviceAccountName: event-exporter
+      containers:
+        - name: event-exporter
+          image: opsgenie/kubernetes-event-exporter:0.9
+          imagePullPolicy: IfNotPresent
+          args:
+            - -conf=/data/config.yaml
+          volumeMounts:
+            - mountPath: /data
+              name: cfg
+      volumes:
+        - name: cfg
+          configMap:
+            name: event-exporter-cfg
+  selector:
+    matchLabels:
+      app: event-exporter
+      version: v1
