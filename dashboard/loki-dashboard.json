@@ -196,7 +196,16 @@
         "description": "Total Count: of $searchable_pattern in the specified time range",
         "fieldConfig": {
           "defaults": {
-            "custom": {}
+            "custom": {},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
           },
           "overrides": []
         },
@@ -261,7 +270,6 @@
             "refId": "A"
           }
         ],
-        "thresholds": "10,50",
         "timeFrom": null,
         "timeShift": null,
         "title": "Total Count: of $searchable_pattern",
@@ -282,7 +290,16 @@
         "description": "Live logs is a like 'tail -f' in a real time",
         "fieldConfig": {
           "defaults": {
-            "custom": {}
+            "custom": {},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
           },
           "overrides": []
         },
@@ -335,6 +352,15 @@
                 "tooltip": false,
                 "viz": false
               }
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
             },
             "mappings": [
               {
@@ -511,16 +537,8 @@
               "mode": "absolute",
               "steps": [
                 {
-                  "color": "#299c46",
+                  "color": "green",
                   "value": null
-                },
-                {
-                  "color": "rgba(237, 129, 40, 0.89)",
-                  "value": 10
-                },
-                {
-                  "color": "#C4162A",
-                  "value": 50
                 }
               ]
             },
@@ -1000,8 +1018,8 @@
         {
           "current": {
             "selected": true,
-            "text": "error",
-            "value": "error"
+            "text": "",
+            "value": ""
           },
           "hide": 0,
           "label": "Search (case insensitive)",
@@ -1009,11 +1027,11 @@
           "options": [
             {
               "selected": true,
-              "text": "error",
-              "value": "error"
+              "text": "",
+              "value": ""
             }
           ],
-          "query": "error",
+          "query": "",
           "skipUrlSync": false,
           "type": "textbox"
         }
