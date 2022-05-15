@@ -279,7 +279,7 @@
               "mode": "thresholds"
             },
             "mappings": [],
-            "noValue": "0 Container Image Pull Failed",
+            "noValue": "none",
             "thresholds": {
               "mode": "absolute",
               "steps": [
