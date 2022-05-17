@@ -311,7 +311,7 @@
         },
         "id": 2,
         "options": {
-          "showLabels": true,
+          "showLabels": false,
           "showTime": false,
           "sortOrder": "Descending",
           "wrapLogMessage": false
