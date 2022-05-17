@@ -1,0 +1,277 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CodeBuild Project for Container Log Sloution (Loki) Deployment
+Resources:
+  CodebuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - CodeBuildIAMRole
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+      ManagedPolicyArns:
+        - !Ref 'CodeBuildPolicy'
+  CodeBuildPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join
+        - '-'
+        - - CodeBuildIAMPolicy
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Description: Managed policy for CodeBuild
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - codebuild:*
+              - eks:*
+              - iam:*
+              - logs:*
+              - cloudformation:*
+            Effect: Allow
+            Resource: '*'
+  ServiceAccountPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: ServiceAccountLokiIAMPolicy
+      Description: Managed policy for ServiceAccount Loki
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:UntagResource
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+              - dynamodb:ListTagsOfResource
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteTable
+              - dynamodb:CreateTable
+              - dynamodb:TagResource
+              - dynamodb:DescribeTable
+              - dynamodb:GetItem
+              - dynamodb:UpdateTable
+              - dynamodb:ListTables
+              - dynamodb:Query
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:DeleteObject
+            Effect: Allow
+            Resource: '*'
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - LambdaExecutionRole
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - !Ref 'LambdaExecutionPolicy'
+  LambdaExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Join
+        - '-'
+        - - LambdaExecutionPolicy
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Description: Managed policy for CodeBuild
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - '*'
+            Effect: Allow
+            Resource: '*'
+  S3BucketLoki:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+        - '-'
+        - - loki-logs-chunks
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+  DynamoDBTableLoki:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableClass: STANDARD
+      TableName: !Join
+        - '-'
+        - - loki-index
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        -
+          AttributeName: h
+          AttributeType: S
+        -
+          AttributeName: r
+          AttributeType: B
+      KeySchema:
+        -
+          AttributeName: h
+          KeyType: HASH
+        -
+          AttributeName: r
+          KeyType: RANGE
+  CodeBuildProjectLoki:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Join
+        - '-'
+        - - deploy-loki-solution
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Description: Deploy Conatiner Log Solution(Loki) to an Existing EKS Cluster
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: REGION
+            Type: PLAINTEXT
+            Value: !Ref 'AWS::Region'
+          - Name: LOKI_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'S3BucketLoki'
+          - Name: LOKI_DDB_TABLE_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'DynamoDBTableLoki'
+          - Name: EKS_CLUSTER_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'EKSClsuterName'
+          - Name: SOURCE_CODE_VENDOR
+            Type: PLAINTEXT
+            Value: !Ref 'SourceCodeVendor'
+          - Name: SAPOLICY
+            Type: PLAINTEXT
+            Value: !Ref 'ServiceAccountPolicy'
+          - Name: DOWNLOAD_URL
+            Type: PLAINTEXT
+            Value: !Ref 'EksctlDownloadUrl'
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: false
+        Type: LINUX_CONTAINER
+      ServiceRole:
+        Fn::GetAtt:
+          - CodebuildRole
+          - Arn
+      Source:
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
+                - wget $DOWNLOAD_URL
+                - tar zxf eksctl_Linux_amd64.tar.gz
+                - chmod +x eksctl && mv eksctl /usr/local/bin/
+                - eksctl version
+                - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+                - chmod +x kubectl && mv kubectl /usr/local/bin/
+                - kubectl version
+                - kubectl create ns loki
+                - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
+                - cd AWSCodeBuild
+            pre_build:
+              commands:
+                - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
+                - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-all.yaml
+            build:
+              commands:
+                - kubectl apply -f yaml/loki-all.yaml
+                - kubectl -n loki get all
+            post_build:
+              commands:
+                - echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="
+        Type: NO_SOURCE
+      Cache:
+        Type: NO_CACHE
+  CleanupS3BucketLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: 
+        ZipFile: 
+          !Sub |
+            import json, boto3, logging
+            import cfnresponse
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+            def lambda_handler(event, context):
+                logger.info("event: {}".format(event))
+                try:
+                    bucket = event['ResourceProperties']['BucketName']
+                    logger.info("bucket: {}, event['RequestType']: {}".format(bucket,event['RequestType']))
+                    if event['RequestType'] == 'Delete':
+                        s3 = boto3.resource('s3')
+                        bucket = s3.Bucket(bucket)
+                        for obj in bucket.objects.filter():
+                            logger.info("delete obj: {}".format(obj))
+                            s3.Object(bucket.name, obj.key).delete()
+                    sendResponseCfn(event, context, cfnresponse.SUCCESS)
+                except Exception as e:
+                    logger.info("Exception: {}".format(e))
+                    sendResponseCfn(event, context, cfnresponse.FAILED)
+            def sendResponseCfn(event, context, responseStatus):
+                responseData = {}
+                responseData['Data'] = {}
+                cfnresponse.send(event, context, responseStatus, responseData, "CustomResourcePhysicalID")            
+      Handler: "index.lambda_handler"
+      Runtime: python3.7
+      MemorySize: 128
+      Timeout: 60
+      FunctionName: !Join
+        - '-'
+        - - cleanup-bucket-on-delete
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Role: !GetAtt LambdaExecutionRole.Arn
+  CleaupBucktOnDelete:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt CleanupS3BucketLambdaFunction.Arn
+      BucketName: !Ref 'S3BucketLoki'
+Parameters:
+  EKSClsuterName:
+    Type: String
+    Description: The EKS Cluster which Loki deploy on
+  SourceCodeVendor:
+    Type: String
+    Default: github
+    AllowedValues:
+      - github
+      - gitee
+    Description: Use Gitee(China) or GitHub(Global) to pull source code
+  EksctlDownloadUrl:
+    Type: String
+    Default: https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
+    AllowedValues:
+      - https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
+      - https://gitee.com/HeyJiqing/AWSCodeBuild/attach_files/1022472/download/eksctl_Linux_amd64.tar.gz
+    Description: Use Gitee(China) or GitHub(Global) to download eksctl binary
+Outputs:
+  CodeBuildIAMRoleARN:
+    Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth'
+    Value: !GetAtt CodebuildRole.Arn
