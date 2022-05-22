@@ -41,7 +41,11 @@ Resources:
   ServiceAccountPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      ManagedPolicyName: ServiceAccountLokiIAMPolicy
+      ManagedPolicyName: !Join
+        - '-'
+        - - ServiceaccountLokiIAMPolicy
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
       Description: Managed policy for ServiceAccount Loki
       PolicyDocument:
         Version: '2012-10-17'
@@ -273,5 +277,5 @@ Parameters:
     Description: Use Gitee(China) or GitHub(Global) to download eksctl binary
 Outputs:
   CodeBuildIAMRoleARN:
-    Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth'
+    Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth' 
     Value: !GetAtt CodebuildRole.Arn
