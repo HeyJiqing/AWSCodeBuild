@@ -1,3 +1,24 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-grafana
+  namespace: loki
+  labels:
+    helm.sh/chart: grafana-6.29.4
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: loki
+    app.kubernetes.io/version: "8.5.3"
+    app.kubernetes.io/managed-by: Helm
+  finalizers:
+    - kubernetes.io/pvc-protection
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "1Gi"
+  storageClassName: gp2
+  volumeMode: Filesystem
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -671,7 +692,8 @@ spec:
           configMap:
             name: loki-grafana
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: loki-grafana
         - name: sc-datasources-volume
           emptyDir: {}
 ---
