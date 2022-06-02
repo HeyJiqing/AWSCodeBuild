@@ -214,6 +214,7 @@ Resources:
                 - kubectl -n loki get all
             post_build:
               commands:
+                - sleep 15
                 - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi
       Cache:
         Type: NO_CACHE
