@@ -206,10 +206,10 @@ Resources:
               commands:
                 - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
                 - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-deploy.yaml
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/plg-deploy.yaml
             build:
               commands:
-                - kubectl apply -f yaml/loki-deploy.yaml
+                - kubectl apply -f yaml/plg-deploy.yaml
                 - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
                 - kubectl -n loki get all
             post_build:
