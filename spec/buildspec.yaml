@@ -19,13 +19,14 @@ phases:
     commands:
       - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
       - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-all.yaml
+      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/plg-deploy.yaml
   
   build:
     commands:
-      - kubectl apply -f yaml/loki-all.yaml
+      - kubectl apply -f yaml/plg-deploy.yaml
+      - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
       - kubectl -n loki get all
 
   post_build:
     commands:
-      - echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="
+      - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi

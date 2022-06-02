@@ -173,6 +173,9 @@ Resources:
           - Name: DOWNLOAD_URL
             Type: PLAINTEXT
             Value: !Ref 'EksctlDownloadUrl'
+          - Name: EXPOSE_TYPE
+            Type: PLAINTEXT
+            Value: !Ref 'GrafanaExposeType'
         Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: false
@@ -202,15 +205,15 @@ Resources:
               commands:
                 - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
                 - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-all.yaml
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/loki-deploy.yaml
             build:
               commands:
-                - kubectl apply -f yaml/loki-all.yaml
+                - kubectl apply -f yaml/loki-deploy.yaml
+                - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
                 - kubectl -n loki get all
             post_build:
               commands:
-                - echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="
-        Type: NO_SOURCE
+                - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi        Type: NO_SOURCE
       Cache:
         Type: NO_CACHE
   CleanupS3BucketLambdaFunction:
@@ -261,6 +264,13 @@ Parameters:
   EKSClsuterName:
     Type: String
     Description: The EKS Cluster which Loki deploy on
+  GrafanaExposeType:
+    Type: String
+    Default: NodePort
+    AllowedValues:
+      - NodePort
+      - Ingress
+    Description: Choose the way to expose Grafana, NodePort(EC2 should have public ip) or Ingress(already installed aws alb controller)
   SourceCodeVendor:
     Type: String
     Default: github
