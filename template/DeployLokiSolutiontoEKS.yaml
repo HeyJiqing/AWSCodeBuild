@@ -176,6 +176,12 @@ Resources:
           - Name: EXPOSE_TYPE
             Type: PLAINTEXT
             Value: !Ref 'GrafanaExposeType'
+          - Name: CHUNK_TARGET_SIZE
+            Type: PLAINTEXT
+            Value: !Ref 'ChunkTargetSize'
+          - Name: CHUNK_IDLE_PERIOD
+            Type: PLAINTEXT
+            Value: !Ref 'ChunkIdlePeriod'  
         Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: false
@@ -206,7 +212,7 @@ Resources:
               commands:
                 - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
                 - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" yaml/plg-deploy.yaml
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" yaml/plg-deploy.yaml
             build:
               commands:
                 - kubectl apply -f yaml/plg-deploy.yaml
@@ -287,6 +293,14 @@ Parameters:
       - https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
       - https://gitee.com/HeyJiqing/AWSCodeBuild/attach_files/1022472/download/eksctl_Linux_amd64.tar.gz
     Description: Use Gitee(China) or GitHub(Global) to download eksctl binary
+  ChunkTargetSize:
+    Type: Number
+    Default: 1572864
+    Description: How long chunks should sit in-memory with no updates before being flushed if they don't hit the max block size.
+  ChunkIdlePeriod:
+    Type: String
+    Default: 30m
+    Description: A target _compressed_ size in bytes for chunks. 
 Outputs:
   CodeBuildIAMRoleARN:
     Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth' 

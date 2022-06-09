@@ -161,7 +161,8 @@ data:
       max_outstanding_requests_per_tenant: 2048
     ingester:
       chunk_block_size: 262144
-      chunk_idle_period: 3m
+      chunk_target_size: CHUNK_TARGET_SIZE
+      chunk_idle_period: CHUNK_IDLE_PERIOD
       chunk_retain_period: 1m
       lifecycler:
         ring:
