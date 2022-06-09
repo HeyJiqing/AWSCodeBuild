@@ -1,67 +1,7 @@
 apiVersion: v1
-kind: Service
+kind: Namespace
 metadata:
-  name: loki-grafana
-  namespace: loki
-  labels:
-    helm.sh/chart: grafana-6.21.3
-    app.kubernetes.io/name: grafana
-    app.kubernetes.io/instance: loki
-    app.kubernetes.io/version: "8.3.5"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: NodePort
-  ports:
-    - name: service
-      port: 80
-      protocol: TCP
-      targetPort: 3000
-  selector:
-    app.kubernetes.io/name: grafana
-    app.kubernetes.io/instance: loki
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: loki-grafana
-  namespace: loki
-  labels:
-    helm.sh/chart: grafana-6.21.3
-    app.kubernetes.io/name: grafana
-    app.kubernetes.io/instance: loki
-    app.kubernetes.io/version: "8.3.5"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-    - name: service
-      port: 80
-      protocol: TCP
-      targetPort: 3000
-  selector:
-    app.kubernetes.io/name: grafana
-    app.kubernetes.io/instance: loki
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    kubernetes.io/ingress.class: alb
-  name: loki-grafana
-  namespace: loki
-spec:
-  rules:
-  - http:
-      paths:
-      - backend:
-          service:
-            name: loki-grafana
-            port:
-              number: 80
-        path: /
-        pathType: Prefix
+  name: loki
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -226,7 +166,8 @@ data:
       max_outstanding_requests_per_tenant: 2048
     ingester:
       chunk_block_size: 262144
-      chunk_idle_period: 3m
+      chunk_target_size: CHUNK_TARGET_SIZE
+      chunk_idle_period: CHUNK_IDLE_PERIOD
       chunk_retain_period: 1m
       lifecycler:
         ring:
