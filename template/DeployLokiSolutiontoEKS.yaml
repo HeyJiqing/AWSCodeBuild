@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CodeBuild Project for Container Log Sloution (Loki) Deployment
+Description: CodeBuild Project for Container Log Sloution (PLG) Deployment
 Resources:
   CodebuildRole:
     Type: AWS::IAM::Role
@@ -111,7 +111,7 @@ Resources:
     Properties:
       BucketName: !Join
         - '-'
-        - - loki-logs-chunks
+        - - logs-chunks
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
   DynamoDBTableLoki:
@@ -120,7 +120,7 @@ Resources:
       TableClass: STANDARD
       TableName: !Join
         - '-'
-        - - loki-index
+        - - log-index
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
       BillingMode: PAY_PER_REQUEST
@@ -138,15 +138,17 @@ Resources:
         -
           AttributeName: r
           KeyType: RANGE
-  CodeBuildProjectLoki:
+  CodeBuildProjectDeployLoki:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Join
         - '-'
-        - - deploy-loki-solution
+        - - deploy-plg-solution
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
-      Description: Deploy Conatiner Log Solution(Loki) to an Existing EKS Cluster
+      Description: Deploy Conatiner Log Solution(PLG) to an Existing EKS Cluster
+      Cache:
+        Type: NO_CACHE
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -181,7 +183,7 @@ Resources:
             Value: !Ref 'ChunkTargetSize'
           - Name: CHUNK_IDLE_PERIOD
             Type: PLAINTEXT
-            Value: !Ref 'ChunkIdlePeriod'  
+            Value: !Ref 'ChunkIdlePeriod'
         Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: false
@@ -222,8 +224,79 @@ Resources:
               commands:
                 - sleep 15
                 - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi
+  CodeBuildProjectUpgradeLoki:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Join
+        - '-'
+        - - upgrade-plg-solution
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Description: Upgrade Conatiner Log Solution(PLG)
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: REGION
+            Type: PLAINTEXT
+            Value: !Ref 'AWS::Region'
+          - Name: LOKI_BUCKET_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'S3BucketLoki'
+          - Name: LOKI_DDB_TABLE_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'DynamoDBTableLoki'
+          - Name: EKS_CLUSTER_NAME
+            Type: PLAINTEXT
+            Value: !Ref 'EKSClsuterName'
+          - Name: SOURCE_CODE_VENDOR
+            Type: PLAINTEXT
+            Value: !Ref 'SourceCodeVendor'
+          - Name: EXPOSE_TYPE
+            Type: PLAINTEXT
+            Value: !Ref 'GrafanaExposeType'
+          - Name: CHUNK_TARGET_SIZE
+            Type: PLAINTEXT
+            Value: !Ref 'ChunkTargetSize'
+          - Name: CHUNK_IDLE_PERIOD
+            Type: PLAINTEXT
+            Value: !Ref 'ChunkIdlePeriod'  
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: false
+        Type: LINUX_CONTAINER
+      ServiceRole:
+        Fn::GetAtt:
+          - CodebuildRole
+          - Arn
       Cache:
         Type: NO_CACHE
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
+                - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
+                - chmod +x kubectl && mv kubectl /usr/local/bin/
+                - kubectl version
+                - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
+                - cd AWSCodeBuild
+            pre_build:
+              commands:
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" yaml/plg-deploy.yaml
+            build:
+              commands:
+                - kubectl apply -f yaml/plg-deploy.yaml
+                - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
+                - sleep 15
+                - kubectl -n loki get all
+            post_build:
+              commands:
+                - echo "UPGRADE SUCCEEDED!!!"
   CleanupS3BucketLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -271,7 +344,7 @@ Resources:
 Parameters:
   EKSClsuterName:
     Type: String
-    Description: The EKS Cluster which Loki deploy on
+    Description: The EKS Cluster which PLG solution deploy on
   GrafanaExposeType:
     Type: String
     Default: NodePort
