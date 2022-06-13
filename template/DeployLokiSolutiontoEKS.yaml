@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: CodeBuild Project for Container Log Sloution (PLG) Deployment
 Resources:
-  CodebuildRole:
+  CodebuildIAMRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Join
@@ -17,8 +17,8 @@ Resources:
             Principal:
               Service: codebuild.amazonaws.com
       ManagedPolicyArns:
-        - !Ref 'CodeBuildPolicy'
-  CodeBuildPolicy:
+        - !Ref 'CodeBuildIAMPolicy'
+  CodeBuildIAMPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Join
@@ -38,7 +38,36 @@ Resources:
               - cloudformation:*
             Effect: Allow
             Resource: '*'
-  ServiceAccountPolicy:
+  ServiceAccountLokiIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - ServiceAccountLokiIAMRole
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      AssumeRolePolicyDocument: !Sub |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": "arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}"
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "${ClusterOIDCURL}:sub": "system:serviceaccount:loki:loki",
+                  "${ClusterOIDCURL}:aud": "sts.amazonaws.com"
+                }
+              }
+            }
+          ]
+        }
+      ManagedPolicyArns:
+        - !Ref 'ServiceAccountLokiIAMPolicy'
+  ServiceAccountLokiIAMPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Join
@@ -73,12 +102,12 @@ Resources:
               - s3:DeleteObject
             Effect: Allow
             Resource: '*'
-  LambdaExecutionRole:
+  CleanupS3LambdaExecutionIAMRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Join
         - '-'
-        - - LambdaExecutionRole
+        - - CleanupS3LambdaExecutionIAMRole
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
       AssumeRolePolicyDocument:
@@ -89,13 +118,13 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
       ManagedPolicyArns:
-        - !Ref 'LambdaExecutionPolicy'
-  LambdaExecutionPolicy:
+        - !Ref 'CleanupS3LambdaExecutionIAMPolicy'
+  CleanupS3LambdaExecutionIAMPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
       ManagedPolicyName: !Join
         - '-'
-        - - LambdaExecutionPolicy
+        - - CleanupS3LambdaExecutionIAMPolicy
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
       Description: Managed policy for CodeBuild
@@ -106,6 +135,43 @@ Resources:
               - '*'
             Effect: Allow
             Resource: '*'
+  ClusterOIDCLambdaExecutionIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Join
+        - '-'
+        - - ClusterOIDCLambdaExecutionIAMRole
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Effect: Allow
+              Action:
+              - eks:DescribeCluster
+              Resource: !Sub "arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}"
+            - Effect: Allow
+              Action:
+              - iam:*OpenIDConnectProvider*
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: "*"
   S3BucketLoki:
     Type: AWS::S3::Bucket
     Properties:
@@ -138,7 +204,7 @@ Resources:
         -
           AttributeName: r
           KeyType: RANGE
-  CodeBuildProjectDeployLoki:
+  CodeBuildProjectDeployPLG:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Join
@@ -165,16 +231,16 @@ Resources:
             Value: !Ref 'DynamoDBTableLoki'
           - Name: EKS_CLUSTER_NAME
             Type: PLAINTEXT
-            Value: !Ref 'EKSClsuterName'
+            Value: !Ref 'EKSClusterName'
           - Name: SOURCE_CODE_VENDOR
             Type: PLAINTEXT
             Value: !Ref 'SourceCodeVendor'
-          - Name: SAPOLICY
-            Type: PLAINTEXT
-            Value: !Ref 'ServiceAccountPolicy'
-          - Name: DOWNLOAD_URL
-            Type: PLAINTEXT
-            Value: !Ref 'EksctlDownloadUrl'
+          # - Name: SAPOLICY
+          #   Type: PLAINTEXT
+          #   Value: !Ref 'ServiceAccountPolicy'
+          # - Name: DOWNLOAD_URL
+          #   Type: PLAINTEXT
+          #   Value: !Ref 'EksctlDownloadUrl'
           - Name: EXPOSE_TYPE
             Type: PLAINTEXT
             Value: !Ref 'GrafanaExposeType'
@@ -184,14 +250,14 @@ Resources:
           - Name: CHUNK_IDLE_PERIOD
             Type: PLAINTEXT
             Value: !Ref 'ChunkIdlePeriod'
+          - Name: SERVICE_ACCOUNT_IAM_ROLE_ARN
+            Type: PLAINTEXT
+            Value: !GetAtt ServiceAccountLokiIAMRole.Arn
         Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
         ImagePullCredentialsType: CODEBUILD
         PrivilegedMode: false
         Type: LINUX_CONTAINER
-      ServiceRole:
-        Fn::GetAtt:
-          - CodebuildRole
-          - Arn
+      ServiceRole: !GetAtt CodebuildIAMRole.Arn
       Source:
         Type: NO_SOURCE
         BuildSpec: |
@@ -200,106 +266,49 @@ Resources:
             install:
               commands:
                 - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
-                - wget $DOWNLOAD_URL
-                - tar zxf eksctl_Linux_amd64.tar.gz
-                - chmod +x eksctl && mv eksctl /usr/local/bin/
-                - eksctl version
+                # - wget $DOWNLOAD_URL
+                # - tar zxf eksctl_Linux_amd64.tar.gz
+                # - chmod +x eksctl && mv eksctl /usr/local/bin/
+                # - eksctl version
                 - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
                 - chmod +x kubectl && mv kubectl /usr/local/bin/
                 - kubectl version
-                - kubectl create ns loki
+                # - kubectl create ns loki
                 - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
                 - cd AWSCodeBuild
             pre_build:
               commands:
-                - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
-                - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" yaml/plg-deploy.yaml
+                # - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
+                # - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
+                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" -e "s/SERVICE_ACCOUNT_IAM_ROLE_ARN/$SERVICE_ACCOUNT_IAM_ROLE_ARN/g" yaml/plg-deploy.yaml
             build:
               commands:
-                - kubectl apply -f yaml/plg-deploy.yaml
-                - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
-                - kubectl -n loki get all
-            post_build:
-              commands:
-                - sleep 15
-                - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi
-  CodeBuildProjectUpgradeLoki:
-    Type: AWS::CodeBuild::Project
+                - cat yaml/plg-deploy.yaml && cat yaml/$EXPOSE_TYPE.yaml
+            #     - kubectl apply -f yaml/plg-deploy.yaml
+            #     - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
+            #     - kubectl -n loki get all
+            # post_build:
+            #   commands:
+            #     - sleep 15
+                # - if [ "$EXPOSE_TYPE" = "NodePort" ]; then echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl get node -o wide |awk '{print $7}' |awk 'NR==2'`':'`kubectl -n loki get svc loki-grafana -o jsonpath={.spec.ports[0].nodePort}` && echo "=========================Grafana Login Info========================="; else echo && echo "=========================Grafana Login Info=========================" && echo "Grafana Login Username:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-user} |base64 -d` && echo "Grafana Login Password:"`kubectl -n loki get secrets loki-grafana -o jsonpath={.data.admin-password} |base64 -d` && echo "Grafana Login Address:http://"`kubectl -n loki get ingress loki-grafana -o jsonpath={.status.loadBalancer.ingress[0].hostname}` && echo "=========================Grafana Login Info========================="; fi
+  CleaupS3OnDelete:
+    Type: Custom::CustomResource
     Properties:
-      Name: !Join
-        - '-'
-        - - upgrade-plg-solution
-          - !Ref 'AWS::AccountId'
-          - !Ref 'AWS::Region'
-      Description: Upgrade Conatiner Log Solution(PLG)
-      Artifacts:
-        Type: NO_ARTIFACTS
-      Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
-        EnvironmentVariables:
-          - Name: REGION
-            Type: PLAINTEXT
-            Value: !Ref 'AWS::Region'
-          - Name: LOKI_BUCKET_NAME
-            Type: PLAINTEXT
-            Value: !Ref 'S3BucketLoki'
-          - Name: LOKI_DDB_TABLE_NAME
-            Type: PLAINTEXT
-            Value: !Ref 'DynamoDBTableLoki'
-          - Name: EKS_CLUSTER_NAME
-            Type: PLAINTEXT
-            Value: !Ref 'EKSClsuterName'
-          - Name: SOURCE_CODE_VENDOR
-            Type: PLAINTEXT
-            Value: !Ref 'SourceCodeVendor'
-          - Name: EXPOSE_TYPE
-            Type: PLAINTEXT
-            Value: !Ref 'GrafanaExposeType'
-          - Name: CHUNK_TARGET_SIZE
-            Type: PLAINTEXT
-            Value: !Ref 'ChunkTargetSize'
-          - Name: CHUNK_IDLE_PERIOD
-            Type: PLAINTEXT
-            Value: !Ref 'ChunkIdlePeriod'  
-        Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
-        ImagePullCredentialsType: CODEBUILD
-        PrivilegedMode: false
-        Type: LINUX_CONTAINER
-      ServiceRole:
-        Fn::GetAtt:
-          - CodebuildRole
-          - Arn
-      Cache:
-        Type: NO_CACHE
-      Source:
-        Type: NO_SOURCE
-        BuildSpec: |
-          version: 0.2
-          phases:
-            install:
-              commands:
-                - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
-                - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
-                - chmod +x kubectl && mv kubectl /usr/local/bin/
-                - kubectl version
-                - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
-                - cd AWSCodeBuild
-            pre_build:
-              commands:
-                - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" yaml/plg-deploy.yaml
-            build:
-              commands:
-                - kubectl apply -f yaml/plg-deploy.yaml
-                - kubectl apply -f yaml/$EXPOSE_TYPE.yaml
-                - sleep 15
-                - kubectl -n loki get all
-            post_build:
-              commands:
-                - echo "UPGRADE SUCCEEDED!!!"
-  CleanupS3BucketLambdaFunction:
+      ServiceToken: !GetAtt CleanupS3LambdaFunction.Arn
+      BucketName: !Ref 'S3BucketLoki'
+  CleanupS3LambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
+      Runtime: python3.7
+      Handler: "index.lambda_handler"
+      MemorySize: 128
+      Role: !GetAtt CleanupS3LambdaExecutionIAMRole.Arn
+      Timeout: 60
+      FunctionName: !Join
+        - '-'
+        - - cleanup-bucket-on-delete
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
       Code: 
         ZipFile: 
           !Sub |
@@ -325,24 +334,107 @@ Resources:
             def sendResponseCfn(event, context, responseStatus):
                 responseData = {}
                 responseData['Data'] = {}
-                cfnresponse.send(event, context, responseStatus, responseData, "CustomResourcePhysicalID")            
-      Handler: "index.lambda_handler"
+                cfnresponse.send(event, context, responseStatus, responseData, "CustomResourcePhysicalID")
+  ClusterOIDCURL:
+    Type: Custom::ClusterOIDCURL
+    Properties:
+      ServiceToken: !GetAtt ClusterOIDCURLFunction.Arn
+      ClusterName: !Ref EKSClusterName
+  ClusterOIDCURLFunction:
+    Type: AWS::Lambda::Function
+    Properties:
       Runtime: python3.7
+      Handler: index.lambda_handler
       MemorySize: 128
-      Timeout: 60
+      Role: !GetAtt ClusterOIDCLambdaExecutionIAMRole.Arn
+      Timeout: 30
       FunctionName: !Join
         - '-'
-        - - cleanup-bucket-on-delete
+        - - get-cluster-oidc-url
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
-      Role: !GetAtt LambdaExecutionRole.Arn
-  CleaupBucktOnDelete:
-    Type: Custom::CustomResource
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import cfnresponse
+          eks = boto3.client("eks")
+          def lambda_handler(event, context):
+            responseData = {}
+            if event['RequestType'] == 'Delete':
+              responseData['Reason'] = "Success"
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, "")
+            else:
+              try:
+                cluster_name = event['ResourceProperties']['ClusterName']
+                response = eks.describe_cluster(name=cluster_name)
+                cluster_oidc_url = response['cluster']['identity']['oidc']['issuer']
+                without_protocol = cluster_oidc_url.replace('https://', '')
+                responseData['Reason'] = "Success"
+                responseData['Url'] = without_protocol
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, without_protocol)
+              except Exception as e:
+                responseData['Reason'] = str(e)
+                cfnresponse.send(event, context, cfnresponse.FAILED, responseData, "")
+  ClusterOIDCProvider:
+    Type: Custom::ClusterOIDCProvider
     Properties:
-      ServiceToken: !GetAtt CleanupS3BucketLambdaFunction.Arn
-      BucketName: !Ref 'S3BucketLoki'
+      ServiceToken: !GetAtt ClusterOIDCProviderFunction.Arn
+      ClusterOIDCURL: !Ref ClusterOIDCURL
+      AccountID: !Ref AWS::AccountId
+      AWSPartition: !Ref AWS::Partition
+  ClusterOIDCProviderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.7
+      Handler: index.lambda_handler
+      MemorySize: 128
+      Role: !GetAtt ClusterOIDCLambdaExecutionIAMRole.Arn
+      Timeout: 30
+      FunctionName: !Join
+        - '-'
+        - - create-cluster-oidc-provider
+          - !Ref 'AWS::AccountId'
+          - !Ref 'AWS::Region'
+      Code:
+        ZipFile: |
+          import boto3
+          from botocore.exceptions import ClientError
+          import json
+          import cfnresponse
+          iam = boto3.client("iam")
+          def lambda_handler(event, context):
+            data = {}
+            try:
+              cluster_oidc_url = event['ResourceProperties']['ClusterOIDCURL']
+              account_id = event['ResourceProperties']['AccountID']
+              partiton = event['ResourceProperties']['AWSPartition']
+              if event['RequestType'] == 'Create':
+                with_protocol = "https://" + cluster_oidc_url
+                oidc_provide_arn = "arn:{0}:iam::{1}:oidc-provider/{2}".format(partiton, account_id, cluster_oidc_url)
+                # arn:aws:iam::859017966381:oidc-provider/oidc.eks.ap-southeast-1.amazonaws.com/id/769D47CB1413F168E93FBCCC7A773215
+                try:
+                  res = iam.get_open_id_connect_provider(OpenIDConnectProviderArn=oidc_provide_arn)
+                  if res.get('Url') == cluster_oidc_url:
+                    data["Reason"] = "Provider already exist, skip"
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, data, oidc_provide_arn)
+                    return 0
+                except Exception as e:
+                  print("oidc provider  not found")
+                issuer_thumbprint = '9e99a48a9960b14926bb7f3b02e22da2b0ab7280'
+                resp = iam.create_open_id_connect_provider(Url=with_protocol,ClientIDList=['sts.amazonaws.com'],ThumbprintList=[issuer_thumbprint])
+                provider_arn = resp['OpenIDConnectProviderArn']
+                data["Reason"] = "Provider with ARN " + provider_arn + " created"
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, data, provider_arn)
+              elif event['RequestType'] == 'Delete':
+                provider_arn = event["PhysicalResourceId"]
+                data["Reason"] = "Provider with ARN " + provider_arn
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, data, provider_arn)
+            except Exception as e:
+              data["Reason"] = "Cannot " + event['RequestType'] + " Provider" + str(e)
+              cfnresponse.send(event, context, cfnresponse.FAILED, data, "")
 Parameters:
-  EKSClsuterName:
+  EKSClusterName:
     Type: String
     Description: The EKS Cluster which PLG solution deploy on
   GrafanaExposeType:
@@ -359,13 +451,13 @@ Parameters:
       - github
       - gitee
     Description: Use Gitee(China) or GitHub(Global) to pull source code
-  EksctlDownloadUrl:
-    Type: String
-    Default: https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
-    AllowedValues:
-      - https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
-      - https://gitee.com/HeyJiqing/AWSCodeBuild/attach_files/1022472/download/eksctl_Linux_amd64.tar.gz
-    Description: Use Gitee(China) or GitHub(Global) to download eksctl binary
+  # EksctlDownloadUrl:
+  #   Type: String
+  #   Default: https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
+  #   AllowedValues:
+  #     - https://github.com/weaveworks/eksctl/releases/download/v0.92.0/eksctl_Linux_amd64.tar.gz
+  #     - https://gitee.com/HeyJiqing/AWSCodeBuild/attach_files/1022472/download/eksctl_Linux_amd64.tar.gz
+  #   Description: Use Gitee(China) or GitHub(Global) to download eksctl binary
   ChunkTargetSize:
     Type: Number
     Default: 1572864
@@ -377,4 +469,10 @@ Parameters:
 Outputs:
   CodeBuildIAMRoleARN:
     Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth' 
-    Value: !GetAtt CodebuildRole.Arn
+    Value: !GetAtt CodebuildIAMRole.Arn
+  ClusterOIDCURL:
+    Description: The OpenID Connect URL (without protocol)
+    Value: !Ref ClusterOIDCURL
+  ClusterOIDCProvider:
+    Description: The ARN of the OIDCProvider
+    Value: !Ref ClusterOIDCProvider
