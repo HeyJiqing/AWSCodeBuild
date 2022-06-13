@@ -177,7 +177,7 @@ Resources:
     Properties:
       BucketName: !Join
         - '-'
-        - - logs-chunks
+        - - log-chunks
           - !Ref 'AWS::AccountId'
           - !Ref 'AWS::Region'
   DynamoDBTableLoki:
