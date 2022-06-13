@@ -4,22 +4,15 @@ phases:
   install:
     commands:
       - aws eks update-kubeconfig --region $REGION --name $EKS_CLUSTER_NAME
-      - wget $DOWNLOAD_URL
-      - tar zxf eksctl_Linux_amd64.tar.gz
-      - chmod +x eksctl && mv eksctl /usr/local/bin/
-      - eksctl version
       - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.21.2/2021-07-05/bin/linux/amd64/kubectl
       - chmod +x kubectl && mv kubectl /usr/local/bin/
       - kubectl version
-      - kubectl create ns loki
       - git clone https://$SOURCE_CODE_VENDOR.com/HeyJiqing/AWSCodeBuild.git
       - cd AWSCodeBuild
 
   pre_build:
     commands:
-      - eksctl utils associate-iam-oidc-provider --region $REGION --cluster $EKS_CLUSTER_NAME --approve
-      - eksctl create iamserviceaccount --region $REGION --cluster $EKS_CLUSTER_NAME --namespace loki --name loki --attach-policy-arn $SAPOLICY --override-existing-serviceaccounts --approve
-      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" yaml/plg-deploy.yaml
+      - sed -i -e "s/REGION/$REGION/g" -e "s/LOKI_BUCKET_NAME/$LOKI_BUCKET_NAME/g" -e "s/LOKI_DDB_TABLE_NAME/$LOKI_DDB_TABLE_NAME/g" -e "s/CHUNK_TARGET_SIZE/$CHUNK_TARGET_SIZE/g" -e "s/CHUNK_IDLE_PERIOD/$CHUNK_IDLE_PERIOD/g" -e "s!SERVICE_ACCOUNT_IAM_ROLE_ARN!$SERVICE_ACCOUNT_IAM_ROLE_ARN!g" yaml/plg-deploy.yaml
   
   build:
     commands:
