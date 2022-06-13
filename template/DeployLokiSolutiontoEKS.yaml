@@ -440,11 +440,11 @@ Parameters:
   ChunkTargetSize:
     Type: Number
     Default: 1572864
-    Description: How long chunks should sit in-memory with no updates before being flushed if they don't hit the max block size.
+    Description: A target _compressed_ size in bytes for chunks. 
   ChunkIdlePeriod:
     Type: String
     Default: 30m
-    Description: A target _compressed_ size in bytes for chunks. 
+    Description: How long chunks should sit in-memory with no updates before being flushed if they don't hit the max block size.
 Outputs:
   CodeBuildIAMRoleARN:
     Description: Role shoule be added to Kubernetes ConfigMap 'aws-auth' 
